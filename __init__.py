@@ -1,21 +1,38 @@
-from CTFd.plugins import register_plugin_assets_directory
+from CTFd.plugins import register_plugin_assets_directory, challenges, keys
 from CTFd.plugins.keys import get_key_class
 from CTFd.models import db, Solves, WrongKeys, Keys, Challenges, Files, Tags
 from CTFd import utils
 
-class CTFdMultiQuestionChallenge(BaseChallenge):
+class MultiQuestionKey(keys.BaseKey):
+    id = len(keys.KEY_CLASSES) + 1
+    name = "MultiQuestion"
+    templates = {  # Handlebars templates used for key editing & viewing
+        'create': '/plugins/CTFd-multi-question-plugin/key-assets/static/create-static-modal.hbs',
+        'update': '/plugins/CTFd-multi-question-plugin/key-assets/static/edit-static-modal.hbs',
+    }
+
+    @staticmethod
+    def compare(saved, provided):
+        if len(saved) != len(provided):
+            return False
+        result = 0
+        for x, y in zip(saved, provided):
+            result |= ord(x) ^ ord(y)
+        return result == 0
+
+class MultiQuestionChallenge(challenges.BaseChallenge):
     id = "MultiQuestion"
     name = "MultiQuestion"
 
     templates = {  # Handlebars templates used for each aspect of challenge editing & viewing
-        'create': '/plugins/challenges/assets/standard-challenge-create.hbs',
-        'update': '/plugins/challenges/assets/standard-challenge-update.hbs',
-        'modal': '/plugins/challenges/assets/standard-challenge-modal.hbs',
+        'create': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-create.hbs',
+        'update': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-update.hbs',
+        'modal': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-modal.hbs',
     }
     scripts = {  # Scripts that are loaded when a template is loaded
-        'create': '/plugins/challenges/assets/standard-challenge-create.js',
-        'update': '/plugins/challenges/assets/standard-challenge-update.js',
-        'modal': '/plugins/challenges/assets/standard-challenge-modal.js',
+        'create': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-create.js',
+        'update': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-update.js',
+        'modal': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-modal.js',
     }
 
     @staticmethod
@@ -168,18 +185,8 @@ class CTFdMultiQuestionChallenge(BaseChallenge):
         db.session.commit()
         db.session.close()
 
-def get_chal_class(class_id):
-    """
-    Utility function used to get the corresponding class from a class ID.
-    :param class_id: String representing the class ID
-    :return: Challenge class
-    """
-    cls = CHALLENGE_CLASSES.get(class_id)
-    if cls is None:
-        raise KeyError
-    return cls
-
-
 def load(app):
-    challenges.challenges.CHALLENGE_CLASSES['MultiQuestion'] = CTFdMultiQuestionChallenge
-    register_plugin_assets_directory(app, base_path='/plugins/challenges/assets/') 
+    challenges.CHALLENGE_CLASSES['MultiQuestion'] = MultiQuestionChallenge
+    keys.KEY_CLASSES['MultiQuestion'] = MultiQuestionKey
+    register_plugin_assets_directory(app, base_path='/plugins/CTFd-multi-question-plugin/challenge-assets/') 
+    register_plugin_assets_directory(app, base_path='/plugins/CTFd-multi-question-plugin/key-assets/')
