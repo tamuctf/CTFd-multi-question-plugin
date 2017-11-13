@@ -3,6 +3,7 @@ from CTFd.plugins.keys import get_key_class
 from CTFd.models import db, Solves, WrongKeys, Keys, Challenges, Files, Tags
 from CTFd import utils
 import sys
+from flask import jsonify
 from flask_sqlalchemy import SQLAlchemy
 
 class MultiQuestionChallengeModel(Challenges):
@@ -95,8 +96,7 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
 
         for key, value in keys.iteritems():
             flag = Keys(chal.id, value['key'], value['type'])
-            if request.form.get('keydata'):
-                flag.data = request.form.get('keydata')
+            flag.data = key
             db.session.add(flag)
 
         db.session.commit()
@@ -181,8 +181,13 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         chal_keys = Keys.query.filter_by(chal=chal.id).all()
         for chal_key in chal_keys:
             if get_key_class(chal_key.key_type).compare(chal_key.flag, provided_key):
-                return True, 'Correct'
-        return False, 'Incorrect'
+                continue
+            else:
+                return False, 'Incorrect'
+        return True, 'Correct'
+
+    def single_solve():
+        pass
 
     @staticmethod
     def solve(team, chal, request):
@@ -221,3 +226,13 @@ def load(app):
     keys.KEY_CLASSES['MultiQuestionKey'] = MultiQuestionKey
     register_plugin_assets_directory(app, base_path='/plugins/CTFd-multi-question-plugin/challenge-assets/') 
     register_plugin_assets_directory(app, base_path='/plugins/CTFd-multi-question-plugin/key-assets/')
+
+    @app.route('/keynames/<int:chalid>')
+    def key_names(chalid):
+        chal_keys = Keys.query.filter_by(chal=chalid).all()
+        key_list = []
+        for key in chal_keys:
+            key_list.append(key.data)
+
+        return jsonify(key_list)       
+
