@@ -2,10 +2,23 @@ from CTFd.plugins import register_plugin_assets_directory, challenges, keys
 from CTFd.plugins.keys import get_key_class
 from CTFd.models import db, Solves, WrongKeys, Keys, Challenges, Files, Tags
 from CTFd import utils
+import sys
+from flask_sqlalchemy import SQLAlchemy
+
+class MultiQuestionChallengeModel(Challenges):
+    __mapper_args__ = {'polymorphic_identity': 'MultiQuestionChallenge'}
+    #id = db.Column(None, db.ForeignKey('challenges.id'), primary_key=True)
+
+    def __init__(self, name, description, value, category, type='MultiQuestionChallenge'):
+        self.name = name
+        self.description = description
+        self.value = value
+        self.category = category
+        self.type = type
 
 class MultiQuestionKey(keys.BaseKey):
     id = len(keys.KEY_CLASSES) + 1
-    name = "MultiQuestion"
+    name = "MultiQuestionKey"
     templates = {  # Handlebars templates used for key editing & viewing
         'create': '/plugins/CTFd-multi-question-plugin/key-assets/static/create-static-modal.hbs',
         'update': '/plugins/CTFd-multi-question-plugin/key-assets/static/edit-static-modal.hbs',
@@ -20,19 +33,19 @@ class MultiQuestionKey(keys.BaseKey):
             result |= ord(x) ^ ord(y)
         return result == 0
 
-class MultiQuestionChallenge(challenges.BaseChallenge):
-    id = "MultiQuestion"
-    name = "MultiQuestion"
+class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
+    id = "MultiQuestionChallenge"
+    name = "MultiQuestionChallenge"
 
     templates = {  # Handlebars templates used for each aspect of challenge editing & viewing
-        'create': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-create.hbs',
-        'update': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-update.hbs',
-        'modal': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-modal.hbs',
+        'create': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-create.hbs',
+        'update': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-update.hbs',
+        'modal': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-modal.hbs',
     }
     scripts = {  # Scripts that are loaded when a template is loaded
-        'create': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-create.js',
-        'update': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-update.js',
-        'modal': '/plugins/CTFd-multi-question-plugin/challenge-assets/standard-challenge-modal.js',
+        'create': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-create.js',
+        'update': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-update.js',
+        'modal': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-modal.js',
     }
 
     @staticmethod
@@ -43,9 +56,24 @@ class MultiQuestionChallenge(challenges.BaseChallenge):
         :return:
         """
         files = request.files.getlist('files[]')
+        print request.form
+        
+        keys = {}
 
+        for i in range(len(request.form)):
+            key_name = 'key_name[{}]'.format(i)
+            key_sol = 'key_solution[{}]'.format(i)
+            key_type = 'key_type[{}]'.format(i)
+            if key_name in request.form:
+                print request.form[key_name]
+                keys[request.form[key_name]] = {'key': request.form[key_sol], 'type': request.form[key_type]} 
+            else:
+                break
+
+        print 'Keys: {}'.format(keys)
+        sys.stdout.flush()
         # Create challenge
-        chal = Challenges(
+        chal = MultiQuestionChallengeModel(
             name=request.form['name'],
             description=request.form['desc'],
             value=request.form['value'],
@@ -65,10 +93,11 @@ class MultiQuestionChallenge(challenges.BaseChallenge):
         db.session.add(chal)
         db.session.commit()
 
-        flag = Keys(chal.id, request.form['key'], request.form['key_type[0]'])
-        if request.form.get('keydata'):
-            flag.data = request.form.get('keydata')
-        db.session.add(flag)
+        for key, value in keys.iteritems():
+            flag = Keys(chal.id, value['key'], value['type'])
+            if request.form.get('keydata'):
+                flag.data = request.form.get('keydata')
+            db.session.add(flag)
 
         db.session.commit()
 
@@ -94,10 +123,10 @@ class MultiQuestionChallenge(challenges.BaseChallenge):
             'max_attempts': challenge.max_attempts,
             'type': challenge.type,
             'type_data': {
-                'id': CTFdStandardChallenge.id,
-                'name': CTFdStandardChallenge.name,
-                'templates': CTFdStandardChallenge.templates,
-                'scripts': CTFdStandardChallenge.scripts,
+                'id': MultiQuestionChallenge.id,
+                'name': MultiQuestionChallenge.name,
+                'templates': MultiQuestionChallenge.templates,
+                'scripts': MultiQuestionChallenge.scripts,
             }
         }
         return challenge, data
@@ -185,8 +214,10 @@ class MultiQuestionChallenge(challenges.BaseChallenge):
         db.session.commit()
         db.session.close()
 
+
+
 def load(app):
-    challenges.CHALLENGE_CLASSES['MultiQuestion'] = MultiQuestionChallenge
-    keys.KEY_CLASSES['MultiQuestion'] = MultiQuestionKey
+    challenges.CHALLENGE_CLASSES['MultiQuestionChallenge'] = MultiQuestionChallenge
+    keys.KEY_CLASSES['MultiQuestionKey'] = MultiQuestionKey
     register_plugin_assets_directory(app, base_path='/plugins/CTFd-multi-question-plugin/challenge-assets/') 
     register_plugin_assets_directory(app, base_path='/plugins/CTFd-multi-question-plugin/key-assets/')
