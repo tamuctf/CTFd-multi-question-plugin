@@ -19,23 +19,6 @@ class MultiQuestionChallengeModel(Challenges):
         self.category = category
         self.type = type
 
-class MultiQuestionKey(keys.BaseKey):
-    id = len(keys.KEY_CLASSES) + 1
-    name = "MultiQuestionKey"
-    templates = {  # Handlebars templates used for key editing & viewing
-        'create': '/plugins/CTFd-multi-question-plugin/key-assets/static/create-static-modal.hbs',
-        'update': '/plugins/CTFd-multi-question-plugin/key-assets/static/edit-static-modal.hbs',
-    }
-
-    @staticmethod
-    def compare(saved, provided):
-        if len(saved) != len(provided):
-            return False
-        result = 0
-        for x, y in zip(saved, provided):
-            result |= ord(x) ^ ord(y)
-        return result == 0
-
 class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
     id = "multiquestionchallenge"
     name = "multiquestionchallenge"
@@ -109,6 +92,7 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
             utils.upload_file(file=f, chalid=chal.id)
 
         db.session.commit()
+        db.session.close()
 
     @staticmethod
     def read(challenge):
@@ -181,16 +165,22 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         :param request: The request the user submitted
         :return: (boolean, string)
         """
+
+        print "attempt request {}".format(request.form)
         provided_key = request.form['key'].strip()
-        provided_keyname = request.form['keyname']
+        provided_keyname = request.form['keyname'].strip()
         chal_keys = Keys.query.filter_by(chal=chal.id).all()
         print "attempt request {}".format(request.form)
         sys.stdout.flush()
         for chal_key in chal_keys:
             key_data = json.loads(chal_key.data)
-            if key_data['keyname'] == provided_keyname and get_key_class(chal_key.key_type).compare(chal_key.flag, provided_key):
-                key_data['solved'] = True
-                chal_key.data = str(key_data)
+            if key_data["keyname"] == provided_keyname and get_key_class(chal_key.key_type).compare(chal_key.flag, provided_key):
+                key_data["solved"] = "false"
+#                chal_key.data = str(key_data)
+                k = Keys.query.filter_by(chal=chal.id, flag=chal_key.flag).first()
+                k.data = str(key_data).replace("'", '"').replace('u', '')
+#                k = Keys.query.filter_by(chal=chal.id, data=str(old_data)).update(dict(data=str(key_data)))
+#                db.session.add(k)
                 db.session.commit()
                 print chal_key.data
                 sys.stdout.flush()
@@ -210,7 +200,9 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         provided_key = request.form['key'].strip()
         chal_keys = Keys.query.filter_by(chal=chal.id).all()
         for chal_key in chal_keys:
-            if not chal_key.data['solved']:
+            print chal_key.data
+            if not json.loads(chal_key.data)["solved"]:
+                print chal_key.data
                 return
  
         solve = Solves(teamid=team.id, chalid=chal.id, ip=utils.get_ip(req=request), flag=provided_key)
@@ -238,90 +230,19 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
 def load(app):
     challenges.CHALLENGE_CLASSES['multiquestionchallenge'] = MultiQuestionChallenge
     register_plugin_assets_directory(app, base_path='/plugins/CTFd-multi-question-plugin/challenge-assets/') 
-    register_plugin_assets_directory(app, base_path='/plugins/CTFd-multi-question-plugin/key-assets/')
     app.db.create_all()
+    app.db.session.expire_on_commit = False
 
     @app.route('/keynames/<int:chalid>')
     def key_names(chalid):
         chal_keys = Keys.query.filter_by(chal=chalid).all()
         key_list = []
         for key in chal_keys:
-            key_list.append(json.loads(key.data)['keyname'])
+            print str(key.data)
+            key_data = str(key.data).replace("'", '"').replace('u', '')
+            print key_data
+            key_list.append(json.loads(key_data)["keyname"])
 
         return jsonify(key_list)       
-
-    @app.route('/chal/multi/<int:chalid>')
-    def single_solve():
-        if utils.ctf_ended() and not utils.view_after_ctf():
-            abort(403)
-        if not utils.user_can_view_challenges():
-            return redirect(url_for('auth.login', next=request.path))
-        if (utils.authed() and utils.is_verified() and (utils.ctf_started() or utils.view_after_ctf())) or utils.is_admin():
-            team = Teams.query.filter_by(id=session['id']).first()
-            fails = WrongKeys.query.filter_by(teamid=session['id'], chalid=chalid).count()
-            logger = logging.getLogger('keys')
-            data = (time.strftime("%m/%d/%Y %X"), session['username'].encode('utf-8'), request.form['key'].encode('utf-8'), utils.get_kpm(session['id']))
-            print("[{0}] {1} submitted {2} with kpm {3}".format(*data))
-
-            chal = Challenges.query.filter_by(id=chalid).first_or_404()
-            if chal.hidden:
-                abort(404)
-            chal_class = get_chal_class(chal.type)
-
-            # Anti-bruteforce / submitting keys too quickly
-            if utils.get_kpm(session['id']) > 10:
-                if utils.ctftime():
-                    chal_class.fail(team=team, chal=chal, request=request)
-                logger.warn("[{0}] {1} submitted {2} with kpm {3} [TOO FAST]".format(*data))
-                # return '3' # Submitting too fast
-                return jsonify({'status': 3, 'message': "You're submitting keys too fast. Slow down."})
-
-            solves = Solves.query.filter_by(teamid=session['id'], chalid=chalid).first()
-
-            # Challange not solved yet
-            if not solves:
-                provided_key = request.form['key'].strip()
-                saved_keys = Keys.query.filter_by(chal=chal.id).all()
-
-                # Hit max attempts
-                max_tries = chal.max_attempts
-                if max_tries and fails >= max_tries > 0:
-                    return jsonify({
-                        'status': 0,
-                        'message': "You have 0 tries remaining"
-                    })
-
-                status, message = chal_class.attempt(chal, request)
-                if status:  # The challenge plugin says the input is right
-                    if utils.ctftime() or utils.is_admin():
-                        chal_class.solve(team=team, chal=chal, request=request)
-                    logger.info("[{0}] {1} submitted {2} with kpm {3} [CORRECT]".format(*data))
-                    return jsonify({'status': 1, 'message': message})
-                else:  # The challenge plugin says the input is wrong
-                    if utils.ctftime() or utils.is_admin():
-                        chal_class.fail(team=team, chal=chal, request=request)
-                    logger.info("[{0}] {1} submitted {2} with kpm {3} [WRONG]".format(*data))
-                    # return '0' # key was wrong
-                    if max_tries:
-                        attempts_left = max_tries - fails - 1  # Off by one since fails has changed since it was gotten
-                        tries_str = 'tries'
-                        if attempts_left == 1:
-                            tries_str = 'try'
-                        if message[-1] not in '!().;?[]\{\}':  # Add a punctuation mark if there isn't one
-                            message = message + '.'
-                        return jsonify({'status': 0, 'message': '{} You have {} {} remaining.'.format(message, attempts_left, tries_str)})
-                    else:
-                        return jsonify({'status': 0, 'message': message})
-
-            # Challenge already solved
-            else:
-                logger.info("{0} submitted {1} with kpm {2} [ALREADY SOLVED]".format(*data))
-                # return '2' # challenge was already solved
-                return jsonify({'status': 2, 'message': 'You already solved this'})
-        else:
-            return jsonify({
-                'status': -1,
-                'message': "You must be logged in to solve a challenge"
-            })
 
 

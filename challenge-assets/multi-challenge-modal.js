@@ -1,10 +1,10 @@
-$('#submit-key0').unbind('click');
+/*$('#submit-key0').unbind('click');
 $('#submit-key0').click(function (e) {
     e.preventDefault();
     console.log(e);
     submitkey($('#chalid').val(), $('#answer-input0').val(), $('#nonce').val())
 });
-
+*/
 $("#answer-input").keyup(function(event){
     if(event.keyCode == 13){
         $("#submit-key").click();
@@ -31,13 +31,13 @@ $('.chal-desc').html(marked(content, {'gfm':true, 'breaks':true}));
 
 function submitkeynew(chal, key, nonce, count, keyname) {
     console.log(count);
-
+    console.log(keyname);
     $('#submit-key' + count).addClass("disabled-button");
     $('#submit-key' + count).prop('disabled', true);
     $.post(script_root + "/chal/" + chal, {
-        keyname: keyname,
         key: key,
-        nonce: nonce
+        nonce: nonce,
+        keyname: keyname,
     }, function (data) {
         var result = $.parseJSON(JSON.stringify(data));
 
@@ -126,7 +126,8 @@ $.get("/keynames/"+$('#chalid').val(), function(data) {
 //            console.log(this.name);
 //            console.log(i);
             j = this.name;
-            submitkeynew($('#chalid').val(), $('#answer-input' + j).val(), $('#nonce').val(), j, $('#answer-input' + j).placeholder);
+    
+            submitkeynew($('#chalid').val(), $('#answer-input' + j).val(), $('#nonce').val(), j, $('#answer-input' + j).attr('placeholder'));
         });
     }
 
