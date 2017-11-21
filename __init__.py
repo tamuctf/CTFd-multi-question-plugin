@@ -2,7 +2,6 @@ from CTFd.plugins import register_plugin_assets_directory, challenges, keys
 from CTFd.plugins.keys import get_key_class
 from CTFd.models import db, Solves, WrongKeys, Keys, Challenges, Files, Tags, Teams
 from CTFd import utils
-import sys
 import json
 import datetime
 from flask import jsonify, session
@@ -63,7 +62,6 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         :return:
         """
         files = request.files.getlist('files[]')
-        print request.form
         
         keys = {}
 
@@ -72,13 +70,10 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
             key_sol = 'key_solution[{}]'.format(i)
             key_type = 'key_type[{}]'.format(i)
             if key_name in request.form:
-                print request.form[key_name]
                 keys[request.form[key_name]] = {'key': request.form[key_sol], 'type': request.form[key_type]}
             else:
                 break
 
-        print 'Keys: {}'.format(keys)
-        sys.stdout.flush()
         # Create challenge
         chal = MultiQuestionChallengeModel(
             name=request.form['name'],
@@ -103,7 +98,6 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         for key, value in keys.iteritems():
             flag = Keys(chal.id, value['key'], value['type'])
             flag.data = json.dumps({key: False})
-            sys.stdout.flush()
             db.session.add(flag)
 
         db.session.commit()
@@ -189,7 +183,6 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         provided_key = request.form['key'].strip()
         provided_keyname = request.form['keyname'].strip()
         chal_keys = Keys.query.filter_by(chal=chal.id).all()
-        sys.stdout.flush()
 
         teamid = Teams.query.filter_by(id=session['id']).first().id
         chalid = request.path[-1]
