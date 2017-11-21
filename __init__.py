@@ -1,15 +1,15 @@
 from CTFd.plugins import register_plugin_assets_directory, challenges, keys
 from CTFd.plugins.keys import get_key_class
-from CTFd.models import db, Solves, WrongKeys, Keys, Challenges, Files, Tags
+from CTFd.models import db, Solves, WrongKeys, Keys, Challenges, Files, Tags, Teams
 from CTFd import utils
 import sys
 import json
-from flask import jsonify
+import datetime
+from flask import jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 
 class MultiQuestionChallengeModel(Challenges):
     __mapper_args__ = {'polymorphic_identity': 'multiquestionchallenge'}
-    #id = db.Column(db.Integer, primary_key=True)
     id = db.Column(None, db.ForeignKey('challenges.id'), primary_key=True)
 
     def __init__(self, name, description, value, category, type='multiquestionchallenge'):
@@ -18,6 +18,27 @@ class MultiQuestionChallengeModel(Challenges):
         self.value = value
         self.category = category
         self.type = type
+
+class Partialsolve(db.Model):
+    __table_args__ = (db.UniqueConstraint('chalid', 'teamid'), {})
+    id = db.Column(db.Integer, primary_key=True)
+    chalid = db.Column(db.Integer, db.ForeignKey('challenges.id'))
+    teamid = db.Column(db.Integer, db.ForeignKey('teams.id'))
+    ip = db.Column(db.String(46))
+    flags = db.Column(db.Text)
+    date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+#    team = db.relationship('Teams', foreign_keys="Solves.teamid", lazy='joined')
+#    chal = db.relationship('Challenges', foreign_keys="Solves.chalid", lazy='joined')
+
+    def __init__(self, teamid, chalid, ip, flags):
+        self.ip = ip
+        self.chalid = chalid
+        self.teamid = teamid
+        self.flags = flags
+
+    def __repr__(self):
+        return '<solve {}, {}, {}, {}>'.format(self.teamid, self.chalid, self.ip, self.flags)    
+    
 
 class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
     id = "multiquestionchallenge"
@@ -81,8 +102,7 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
 
         for key, value in keys.iteritems():
             flag = Keys(chal.id, value['key'], value['type'])
-            flag.data = '{"keyname": "'+key+'", "solved": false}'
-            print flag.data
+            flag.data = json.dumps({key: False})
             sys.stdout.flush()
             db.session.add(flag)
 
@@ -166,26 +186,38 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         :return: (boolean, string)
         """
 
-        print "attempt request {}".format(request.form)
         provided_key = request.form['key'].strip()
         provided_keyname = request.form['keyname'].strip()
         chal_keys = Keys.query.filter_by(chal=chal.id).all()
-        print "attempt request {}".format(request.form)
         sys.stdout.flush()
+
+        teamid = Teams.query.filter_by(id=session['id']).first().id
+        chalid = request.path[-1]
+        partial = Partialsolve.query.filter_by(teamid=teamid, chalid=chalid).first()
+        if not partial:
+            keys = {}
+
+            for chal_key in chal_keys:
+                keys.update(json.loads(chal_key.data))
+
+            flags = json.dumps(keys)
+            psolve = Partialsolve(teamid=teamid, chalid=chalid, ip=utils.get_ip(req=request), flags=flags)
+            db.session.add(psolve)
+            db.session.commit()
+
         for chal_key in chal_keys:
             key_data = json.loads(chal_key.data)
-            if key_data["keyname"] == provided_keyname and get_key_class(chal_key.key_type).compare(chal_key.flag, provided_key):
-                key_data["solved"] = "false"
-#                chal_key.data = str(key_data)
-                k = Keys.query.filter_by(chal=chal.id, flag=chal_key.flag).first()
-                k.data = str(key_data).replace("'", '"').replace('u', '')
-#                k = Keys.query.filter_by(chal=chal.id, data=str(old_data)).update(dict(data=str(key_data)))
-#                db.session.add(k)
+
+            if provided_keyname in key_data and get_key_class(chal_key.key_type).compare(chal_key.flag, provided_key):
+                db.session.expunge_all()
+                partial = Partialsolve.query.filter_by(teamid=teamid, chalid=chalid).first()
+
+                keys = json.loads(partial.flags)
+                keys[provided_keyname] = True
+                partial.flags = json.dumps(keys)
                 db.session.commit()
-                print chal_key.data
-                sys.stdout.flush()
                 return True, 'Correct'
-        
+
         return False, 'Incorrect'
 
     @staticmethod
@@ -197,15 +229,20 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         :param request: The request the user submitted
         :return:
         """
+        teamid = Teams.query.filter_by(id=session['id']).first().id
+        chalid = request.path[-1]
         provided_key = request.form['key'].strip()
-        chal_keys = Keys.query.filter_by(chal=chal.id).all()
-        for chal_key in chal_keys:
-            print chal_key.data
-            if not json.loads(chal_key.data)["solved"]:
-                print chal_key.data
+        db.session.expunge_all()
+        partial =  Partialsolve.query.filter_by(teamid=teamid, chalid=chalid).first()
+        keys = json.loads(partial.flags)
+
+        for key, solved in keys.iteritems():
+            print key, solved
+            if not solved:
                 return
- 
-        solve = Solves(teamid=team.id, chalid=chal.id, ip=utils.get_ip(req=request), flag=provided_key)
+
+        db.session.expunge_all() 
+        solve = Solves(teamid=teamid, chalid=chalid, ip=utils.get_ip(req=request), flag=provided_key)
         db.session.add(solve)
         db.session.commit()
         db.session.close()
@@ -219,8 +256,10 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         :param request: The request the user submitted
         :return:
         """
+        chalid =  chalid = request.path[-1]
+        teamid = Teams.query.filter_by(id=session['id']).first().id
         provided_key = request.form['key'].strip()
-        wrong = WrongKeys(teamid=team.id, chalid=chal.id, ip=utils.get_ip(request), flag=provided_key)
+        wrong = WrongKeys(teamid=teamid, chalid=chalid, ip=utils.get_ip(request), flag=provided_key)
         db.session.add(wrong)
         db.session.commit()
         db.session.close()
@@ -231,17 +270,13 @@ def load(app):
     challenges.CHALLENGE_CLASSES['multiquestionchallenge'] = MultiQuestionChallenge
     register_plugin_assets_directory(app, base_path='/plugins/CTFd-multi-question-plugin/challenge-assets/') 
     app.db.create_all()
-    app.db.session.expire_on_commit = False
 
     @app.route('/keynames/<int:chalid>')
     def key_names(chalid):
         chal_keys = Keys.query.filter_by(chal=chalid).all()
         key_list = []
         for key in chal_keys:
-            print str(key.data)
-            key_data = str(key.data).replace("'", '"').replace('u', '')
-            print key_data
-            key_list.append(json.loads(key_data)["keyname"])
+            key_list.append(json.loads(key.data).keys()[0])
 
         return jsonify(key_list)       
 
