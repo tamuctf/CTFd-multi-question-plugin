@@ -185,7 +185,7 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         chal_keys = Keys.query.filter_by(chal=chal.id).all()
 
         teamid = Teams.query.filter_by(id=session['id']).first().id
-        chalid = request.path[-1]
+        chalid = request.path.split('/')[-1]
         partial = Partialsolve.query.filter_by(teamid=teamid, chalid=chalid).first()
         if not partial:
             keys = {}
