@@ -223,7 +223,7 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         :return:
         """
         teamid = Teams.query.filter_by(id=session['id']).first().id
-        chalid = request.path[-1]
+        chalid = request.path.split('/')[-1]
         provided_key = request.form['key'].strip()
         db.session.expunge_all()
         partial =  Partialsolve.query.filter_by(teamid=teamid, chalid=chalid).first()
@@ -249,7 +249,7 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         :param request: The request the user submitted
         :return:
         """
-        chalid =  chalid = request.path[-1]
+        chalid = request.path.split('/')[-1]
         teamid = Teams.query.filter_by(id=session['id']).first().id
         provided_key = request.form['key'].strip()
         wrong = WrongKeys(teamid=teamid, chalid=chalid, ip=utils.get_ip(request), flag=provided_key)
