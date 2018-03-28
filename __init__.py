@@ -2,9 +2,10 @@ from CTFd.plugins import register_plugin_assets_directory, challenges, keys
 from CTFd.plugins.keys import get_key_class
 from CTFd.models import db, Solves, WrongKeys, Keys, Challenges, Files, Tags, Teams
 from CTFd import utils
+from CTFd.utils import admins_only, is_admin
 import json
 import datetime
-from flask import jsonify, session
+from flask import jsonify, session, request
 from flask_sqlalchemy import SQLAlchemy
 import sys
 
@@ -142,8 +143,9 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         :param request:
         :return:
         """
+        sys.stdout.flush()
         challenge.name = request.form['name']
-        challenge.description = request.form['desc']
+        challenge.description = request.form['description']
         challenge.value = int(request.form.get('value', 0)) if request.form.get('value', 0) else 0
         challenge.max_attempts = int(request.form.get('max_attempts', 0)) if request.form.get('max_attempts', 0) else 0
         challenge.category = request.form['category']
@@ -167,6 +169,7 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         Files.query.filter_by(chal=challenge.id).delete()
         Tags.query.filter_by(chal=challenge.id).delete()
         Challenges.query.filter_by(id=challenge.id).delete()
+        Partialsolve.query.filter_by(chalid=chalid).delete()
         db.session.commit()
 
     @staticmethod
@@ -230,7 +233,6 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         keys = json.loads(partial.flags)
 
         for key, solved in keys.iteritems():
-            print key, solved
             if not solved:
                 return
 
@@ -272,5 +274,38 @@ def load(app):
             key_list.append(json.loads(key.data).keys()[0])
 
         return jsonify(key_list)       
+
+    def admin_keys_view(keyid):
+        if request.method == 'GET':
+            if keyid:
+                saved_key = Keys.query.filter_by(id=keyid).first_or_404()
+                key_class = get_key_class(saved_key.type)
+                json_data = {
+                    'id': saved_key.id,
+                    'key': saved_key.flag,
+                    'data': saved_key.data,
+                    'chal': saved_key.chal,
+                    'type': saved_key.type,
+                    'type_name': key_class.name,
+                    'templates': key_class.templates,
+                }
+
+                return jsonify(json_data)
+        elif request.method == 'POST':
+            chal = request.form.get('chal')
+            flag = request.form.get('key')
+            key_type = request.form.get('key_type')
+            if not keyid:
+                k = Keys(chal, flag, key_type)
+                db.session.add(k)
+            else:
+                k = Keys.query.filter_by(id=keyid).first()
+                k.flag = flag
+                k.type = key_type
+            db.session.commit()
+            db.session.close()
+            return '1'
+
+    app.view_functions['admin_keys.admin_keys_view'] = admin_keys_view
 
 
