@@ -99,6 +99,8 @@ function submitkeynew(chal, key, nonce, count, keyname) {
 $.get("/keynames/"+$('#chal-id').val(), function(data) {
     console.log(data);
 
+    data.sort();
+
     for(i = 0; i < data.length; i++) {
         key = `<div class="row submit-row">
                     <div class="col-md-9 form-group">
