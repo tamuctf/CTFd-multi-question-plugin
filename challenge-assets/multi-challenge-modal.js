@@ -96,28 +96,25 @@ function submitkeynew(chal, key, nonce, count, keyname) {
     })
 }
 
-$.get("/keynames/"+$('#chalid').val(), function(data) {
+$.get("/keynames/"+$('#chal-id').val(), function(data) {
     console.log(data);
 
     for(i = 0; i < data.length; i++) {
-        key = `
-        <div class="row submit-row">
-            <div class="col-md-9" style="padding-right:0px;padding-left:10px;">
-                <span class="input">
-                    <input class="input-field" type="text" name="answer" id="answer-input` + i + `" placeholder="` + data[i] + `" />
-                </span>
-            </div>
-            <div class="col-md-3 key-submit">
-                <button name="` + i + `" type="submit" id="submit-key` + i + `" tabindex="5" class="btn btn-md btn-theme btn-outlined pull-right" style="height:46.375px">Submit</button>
-            </div>
-        </div>
-        <div class="row notification-row">
-            <div id="result-notification` + i + `" class="alert alert-dismissable text-center" role="alert" style="display: none;">
-              <strong id="result-message` + i + `"></strong>
-            </div>
-        </div>`
-
-
+        key = `<div class="row submit-row">
+                    <div class="col-md-9 form-group">
+                        <input class="form-control" type="text" name="answer" id="answer-input` + i +`" placeholder="` + data[i] + `" />
+                    </div>
+                    <div class="col-md-3 form-group key-submit">
+                        <button  name="` + i + `" type="submit" id="submit-key` + i + `" tabindex="5" class="btn btn-md btn-outline-secondary float-right">Submit</button>
+                    </div>
+                </div>
+                <div class="row notification-row">
+                    <div class="col-md-12">
+                        <div id="result-notification` + i + `" class="alert alert-dismissable text-center w-100" role="alert" style="display: none;">
+                          <strong id="result-message` + i + `"></strong>
+                        </div>
+                    </div>
+                </div>`
         $("#keylist").append(key);
 
         $('#submit-key' + i).unbind('click');
@@ -127,7 +124,7 @@ $.get("/keynames/"+$('#chalid').val(), function(data) {
 //            console.log(i);
             j = this.name;
     
-            submitkeynew($('#chalid').val(), $('#answer-input' + j).val(), $('#nonce').val(), j, $('#answer-input' + j).attr('placeholder'));
+            submitkeynew($('#chal-id').val(), $('#answer-input' + j).val(), $('#nonce').val(), j, $('#answer-input' + j).attr('placeholder'));
         });
     }
 

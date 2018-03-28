@@ -6,6 +6,7 @@ import json
 import datetime
 from flask import jsonify, session
 from flask_sqlalchemy import SQLAlchemy
+import sys
 
 class MultiQuestionChallengeModel(Challenges):
     __mapper_args__ = {'polymorphic_identity': 'multiquestionchallenge'}
@@ -44,9 +45,9 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
     name = "multiquestionchallenge"
 
     templates = {  # Handlebars templates used for each aspect of challenge editing & viewing
-        'create': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-create.hbs',
-        'update': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-update.hbs',
-        'modal': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-modal.hbs',
+        'create': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-create.njk',
+        'update': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-update.njk',
+        'modal': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-modal.njk',
     }
     scripts = {  # Scripts that are loaded when a template is loaded
         'create': '/plugins/CTFd-multi-question-plugin/challenge-assets/multi-challenge-create.js',
@@ -62,7 +63,6 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         :return:
         """
         files = request.files.getlist('files[]')
-        
         keys = {}
 
         for i in range(len(request.form)):
@@ -77,7 +77,7 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         # Create challenge
         chal = MultiQuestionChallengeModel(
             name=request.form['name'],
-            description=request.form['desc'],
+            description=request.form['description'],
             value=request.form['value'],
             category=request.form['category'],
             type=request.form['chaltype']
@@ -201,7 +201,7 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         for chal_key in chal_keys:
             key_data = json.loads(chal_key.data)
 
-            if provided_keyname in key_data and get_key_class(chal_key.key_type).compare(chal_key.flag, provided_key):
+            if provided_keyname in key_data and get_key_class(chal_key.type).compare(chal_key.flag, provided_key):
                 db.session.expunge_all()
                 partial = Partialsolve.query.filter_by(teamid=teamid, chalid=chalid).first()
 

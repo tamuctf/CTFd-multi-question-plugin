@@ -20,31 +20,20 @@ $('#solve-attempts-checkbox').change(function() {
 
 var count = 1;
 $("#add-new-question").click(function () {
-    var key = `<div class="row">
-                <div class="col-md-8">
-                    <label for="key">Key
-                        <i class="fa fa-question-circle gray-text" data-toggle="tooltip" data-placement="right" title="This is the flag/solution for the challenge."></i>
-                    </label>
-                    <input type="text" class="form-control" name="key_name[` + count + `]" placeholder="Enter Key Name">
-                    <input type="text" class="form-control" name="key_solution[` + count + `]" placeholder="Enter Key Solution">
-                </div>
-                <div class="form-vertical">
-                    <div class="col-md-2">
-                        <div class="radio">
-                            <label>
-                                <input type="radio" name="key_type[` + count + `]" value="static" checked>
-                                Static
-                            </label>
-                        </div>
-                        <div class="radio">
-                            <label>
-                                <input type="radio" name="key_type[` + count + `]" value="regex">
-                                Regex
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </div>`
+    var key = `<div class="form-group">
+        <label>Flag
+            <i class="far fa-question-circle text-muted cursor-help" data-toggle="tooltip" data-placement="right" title="This is the flag or solution for your challenge. You can choose whether your flag is a static string or a regular expression."></i>
+        </label>
+        <input type="text" class="form-control" name="key_name[` + count + `]" placeholder="Enter Key Name">
+        <input type="text" class="form-control" name="key_solution[` + count + `]" placeholder="Enter Key Solution">
+    </div>
+        <div class="form-group">
+            <select class="custom-select" name="key_type[` + count + `]">
+                <option value="static">Static</option>
+                <option value="regex">Regex</option>
+            </select>
+        </div>
+    </div>`
 
     $('#key-list').append(key);
     count += 1;
