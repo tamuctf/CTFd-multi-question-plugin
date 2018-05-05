@@ -205,7 +205,7 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
         for chal_key in chal_keys:
             key_data = json.loads(chal_key.data)
 
-            if provided_keyname in key_data and get_key_class(chal_key.type).compare(chal_key.flag, provided_key):
+            if provided_keyname in key_data and get_key_class(chal_key.type).compare(chal_key, provided_key):
                 db.session.expunge_all()
                 partial = Partialsolve.query.filter_by(teamid=teamid, chalid=chalid).first()
 

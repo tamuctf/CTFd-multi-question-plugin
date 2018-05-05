@@ -1,33 +1,51 @@
-/*$('#submit-key0').unbind('click');
-$('#submit-key0').click(function (e) {
-    e.preventDefault();
-    console.log(e);
-    submitkey($('#chalid').val(), $('#answer-input0').val(), $('#nonce').val())
-});
-*/
-$("#answer-input").keyup(function(event){
-    if(event.keyCode == 13){
-        $("#submit-key").click();
-    }
+window.challenge.renderer = new markdownit({
+    html: true,
 });
 
-$(".input-field").bind({
-    focus: function() {
-        $(this).parent().addClass('input--filled' );
-        $label = $(this).siblings(".input-label");
-    },
-    blur: function() {
-        if ($(this).val() === '') {
-            $(this).parent().removeClass('input--filled' );
-            $label = $(this).siblings(".input-label");
-            $label.removeClass('input--hide' );
+window.challenge.preRender = function(){
+};
+
+window.challenge.render = function(markdown){
+    return window.challenge.renderer.render(markdown);
+};
+
+window.challenge.postRender = function(){
+    $.get("/keynames/"+$('#chal-id').val(), function(data) {
+
+        console.log(data);
+
+        data.sort();
+
+        for(i = 0; i < data.length; i++) {
+            key = `<div class="row submit-row">
+                        <div class="col-md-9 form-group">
+                            <input class="form-control" type="text" name="answer" id="answer-input` + i +`" placeholder="` + data[i] + `" />
+                        </div>
+                        <div class="col-md-3 form-group key-submit">
+                            <button  name="` + i + `" type="submit" id="submit-key` + i + `" tabindex="5" class="btn btn-md btn-outline-secondary float-right">Submit</button>
+                        </div>
+                    </div>
+                    <div class="row notification-row">
+                        <div class="col-md-12">
+                            <div id="result-notification` + i + `" class="alert alert-dismissable text-center w-100" role="alert" style="display: none;">
+                              <strong id="result-message` + i + `"></strong>
+                            </div>
+                        </div>
+                    </div>`
+            $("#keylist").append(key);
+
+            $('#submit-key' + i).unbind('click');
+            $('#submit-key' + i).click(function (e) {
+                e.preventDefault();
+                j = this.name;
+
+                submitkeynew($('#chal-id').val(), $('#answer-input' + j).val(), $('#nonce').val(), j, $('#answer-input' + j).attr('placeholder'));
+            });
         }
-    }
-});
-var content = $('.chal-desc').text();
-var decoded = $('<textarea/>').html(content).val()
 
-$('.chal-desc').html(marked(content, {'gfm':true, 'breaks':true}));
+    });
+
+};
 
 function submitkeynew(chal, key, nonce, count, keyname) {
     console.log(count);
@@ -95,40 +113,3 @@ function submitkeynew(chal, key, nonce, count, keyname) {
         }, 3000);
     })
 }
-
-$.get("/keynames/"+$('#chal-id').val(), function(data) {
-    console.log(data);
-
-    data.sort();
-
-    for(i = 0; i < data.length; i++) {
-        key = `<div class="row submit-row">
-                    <div class="col-md-9 form-group">
-                        <input class="form-control" type="text" name="answer" id="answer-input` + i +`" placeholder="` + data[i] + `" />
-                    </div>
-                    <div class="col-md-3 form-group key-submit">
-                        <button  name="` + i + `" type="submit" id="submit-key` + i + `" tabindex="5" class="btn btn-md btn-outline-secondary float-right">Submit</button>
-                    </div>
-                </div>
-                <div class="row notification-row">
-                    <div class="col-md-12">
-                        <div id="result-notification` + i + `" class="alert alert-dismissable text-center w-100" role="alert" style="display: none;">
-                          <strong id="result-message` + i + `"></strong>
-                        </div>
-                    </div>
-                </div>`
-        $("#keylist").append(key);
-
-        $('#submit-key' + i).unbind('click');
-        $('#submit-key' + i).click(function (e) {
-            e.preventDefault();
-//            console.log(this.name);
-//            console.log(i);
-            j = this.name;
-    
-            submitkeynew($('#chal-id').val(), $('#answer-input' + j).val(), $('#nonce').val(), j, $('#answer-input' + j).attr('placeholder'));
-        });
-    }
-
-});
-
