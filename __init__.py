@@ -168,9 +168,9 @@ class MultiQuestionChallenge(challenges.CTFdStandardChallenge):
             utils.delete_file(f.id)
         Files.query.filter_by(chal=challenge.id).delete()
         Tags.query.filter_by(chal=challenge.id).delete()
-        Challenges.query.filter_by(id=challenge.id).delete()
         Partialsolve.query.filter_by(chalid=challenge.id).delete()
         MultiQuestionChallengeModel.query.filter_by(id=challenge.id).delete()
+        Challenges.query.filter_by(id=challenge.id).delete()
         db.session.commit()
 
     @staticmethod
